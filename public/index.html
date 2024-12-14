@@ -1,0 +1,27 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrzyServer</title>
+</head>
+
+<body>
+    <div>
+        <h1>Welcome!</h1>
+        <p>Enjoy your stay</p>
+    </div>
+    <div>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <p>Owner name:</p>
+            <input type="text" name="owner-name" id="owner"><br>
+            <p>Description</p>
+            <input type="text" name="description" id="description"><br>
+            <p>File(s):</p>
+            <input type="file" name="files" id="files" multiple><br><br>
+            <input type="submit" value="Submit">
+        </form>
+    </div>
+</body>
+
+</html>
