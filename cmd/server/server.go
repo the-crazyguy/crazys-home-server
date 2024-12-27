@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +11,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	router := gin.Default()
 	// TODO: Max multipart memory
 
@@ -24,7 +25,7 @@ func main() {
 
 	router.POST("/login-form", postLoginForm)
 	router.POST("/upload", postUpload)
-	router.GET("/download/:filename", authnMiddlewareMock, postDownload)
+	router.GET("/download/:filename", authnMiddlewareMock, getDownload)
 
 	router.Run("localhost:8080")
 }
@@ -60,7 +61,7 @@ func authnMiddleware(c *gin.Context) {
 	c.Next()
 }
 
-func postDownload(c *gin.Context) {
+func getDownload(c *gin.Context) {
 	// Step 1: Get username from context
 	username, exists := c.Get("username")
 
@@ -158,7 +159,8 @@ func postUpload(c *gin.Context) {
 		return
 	}
 
-	uploadDir := fmt.Sprintf("./user-files/%s", owner)
+	uploadDir := filepath.Join(".", "user-files", owner)
+	log.Printf("uploadDir: %s\n", uploadDir)
 
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 		c.String(http.StatusInternalServerError, "Directory creation error: %s", err.Error())
@@ -168,7 +170,8 @@ func postUpload(c *gin.Context) {
 	for _, f := range files {
 		fileName := filepath.Base(f.Filename)
 
-		uploadPath := fmt.Sprintf("%s/%s", uploadDir, fileName)
+		uploadPath := filepath.Join(uploadDir, fileName)
+		log.Printf("uploadPath: %s\n", uploadPath)
 
 		if err := c.SaveUploadedFile(f, uploadPath); err != nil {
 			c.String(http.StatusBadRequest, "Upload file error: %s", err.Error())
