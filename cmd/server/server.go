@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"crzy-server/internal/authentication"
 )
 
 func main() {
@@ -15,6 +17,7 @@ func main() {
 
 	router := gin.Default()
 	// TODO: Remove once done w/ testing
+	// secure := router.Group("/secure", authnMiddleware)
 	unsecure := router.Group("/unsecure", authnMiddlewareMock)
 	// TODO: Max multipart memory
 
@@ -56,12 +59,33 @@ func authnMiddleware(c *gin.Context) {
 	// TODO: REMOVE, here for testing
 	log.Println(tknStr)
 	// Step 3: Parse the token (i.e. with jwt)
-
+	token, err := authentication.ParseToken(tknStr)
 	// Step 4: Check for token validity
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse auth token"})
+		log.Println("Error: Could not parse auth token: ", err.Error())
+		c.Abort()
+		return
+	}
+
+	if !token.Valid {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid token"})
+		log.Println("Error: Invalid token")
+		c.Abort()
+		return
+	}
 
 	// Step 5: Extract useful information from claims i.e. Username
+	claims, err := authentication.GetClaims(token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse claims"})
+		log.Println("Error: Could not parse claims: ", err.Error())
+		c.Abort()
+		return
+	}
 
 	// Step 6: Set the extracted information in the context (c)
+	c.Set("username", claims.Username)
 
 	// Step 7: Continue to next handler
 	c.Next()

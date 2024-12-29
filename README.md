@@ -41,13 +41,23 @@ will be written in Go, however, for production, a more well-established
 solution, such as NGINX, will be used (*after understanding what it does and why
 it is used*)
 
+## Access
 
+- Each user has access to their own files (in their own directory)
+- Users can grant access to other users via the other person's username/id
+    - People with view/download access can be added to each user's internal list
+    of trusted users
+- The user information will be checked on the back-end
+- The front-end will purely serve as a means to display and handle the current
+user's requests, and will not do any authentication logic besides retrieving and
+saving JWT from the back-end
 
 ## References
 
 - [Go/Gin getting started docs](https://go.dev/doc/tutorial/web-service-gin)
 - [Gin upload docs](https://gin-gonic.com/docs/examples/upload-file/multiple-file/)
 - [Gin static files](https://chroniconl.vercel.app/articles/serving-static-content-with-go-and-gin)
+- [Go JWT Library create tokens](https://golang-jwt.github.io/jwt/usage/create/)
 
 ## Resources to look up later
 
@@ -55,3 +65,4 @@ it is used*)
 - [Go Authentication methods by JetBrains](https://www.jetbrains.com/guide/go/tutorials/authentication-for-go-apps/auth/)
 - [Go HTTPS/TLS](https://eli.thegreenplace.net/2021/go-https-servers-with-tls/)
 - [Go net/http/httputil reverse proxy](https://pkg.go.dev/net/http/httputil#ReverseProxy)
+- [Login system PoC](https://medium.com/@cheickzida/golang-implementing-jwt-token-authentication-bba9bfd84d60#:~:text=Implementing%20a%20Login%20System)
