@@ -4,6 +4,8 @@ Home server for file storage and private web hosting
 
 ## Next-time
 
+Login
+
 Implement JWT logic, without worrying about https/tls (will be configured later
 or at the proxy level)
 
@@ -52,12 +54,18 @@ it is used*)
 user's requests, and will not do any authentication logic besides retrieving and
 saving JWT from the back-end
 
+### Q: Why have passwords instead of just providing a JWT that is valid for N amount of time?
+
+A: Users would then be liimited to a single device. They would need the JWT stored
+somewhere, which is inconvenient. Instead, they can use credentials (username/password)
+
 ## References
 
 - [Go/Gin getting started docs](https://go.dev/doc/tutorial/web-service-gin)
 - [Gin upload docs](https://gin-gonic.com/docs/examples/upload-file/multiple-file/)
 - [Gin static files](https://chroniconl.vercel.app/articles/serving-static-content-with-go-and-gin)
 - [Go JWT Library create tokens](https://golang-jwt.github.io/jwt/usage/create/)
+- [Authentication example](https://mazle78.notion.site/Authentication-and-Authorization-in-Go-with-Gin-120fd437022f80fbab95ff24bf9f0631)
 
 ## Resources to look up later
 
@@ -66,3 +74,8 @@ saving JWT from the back-end
 - [Go HTTPS/TLS](https://eli.thegreenplace.net/2021/go-https-servers-with-tls/)
 - [Go net/http/httputil reverse proxy](https://pkg.go.dev/net/http/httputil#ReverseProxy)
 - [Login system PoC](https://medium.com/@cheickzida/golang-implementing-jwt-token-authentication-bba9bfd84d60#:~:text=Implementing%20a%20Login%20System)
+
+---
+
+- [Auth w/ db example](https://ututuv.medium.com/building-user-authentication-and-authorisation-api-in-go-using-gin-and-gorm-93dfe38e0612)
+- Using an .env file for things such as the JWT signing key

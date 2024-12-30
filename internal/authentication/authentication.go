@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // TODO: Make it instance-based?
@@ -19,15 +20,21 @@ type UserClaims struct {
 	jwt.RegisteredClaims
 }
 
-// TODO: Add more options for expiration/validity?
-func NewTokenString(username string) (string, error) {
-	if username == "" {
-		return "", errors.New("Error cannot be empty")
+func NewTokenString(claims *UserClaims) (string, error) {
+	if claims.Username == "" {
+		return "", errors.New("Username cannot be empty")
 	}
 
+	// TODO: USe asymetics signing method later, see https://golang-jwt.github.io/jwt/usage/create/
+	tkn := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	return tkn.SignedString(signingKey)
+}
+
+func NewDefaultTokenString(username string) (string, error) {
 	c := &UserClaims{
-		username,
-		jwt.RegisteredClaims{
+		Username: username,
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
 			Issuer:    issuerVal,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -36,10 +43,7 @@ func NewTokenString(username string) (string, error) {
 		},
 	}
 
-	// TODO: USe asymetics signing method later, see https://golang-jwt.github.io/jwt/usage/create/
-	tkn := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
-
-	return tkn.SignedString(signingKey)
+	return NewTokenString(c)
 }
 
 func GetClaims(token *jwt.Token) (*UserClaims, error) {
@@ -72,4 +76,19 @@ func ParseToken(tokenStr string) (*jwt.Token, error) {
 			return signingKey, nil
 		},
 	)
+}
+
+// TODO: Benchmark to get an idea for the optimal cost (10 is the default)
+// From a quick search, the general idea is for it to be ~250ms
+// Keep in mind it will run on a different machine, so benchmarks should be run
+// on the target hardware when deployed
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+
+	return string(bytes), err
+}
+
+// Returns nil on success, error on failure
+func VerifyPassword(hashedPassword, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 }

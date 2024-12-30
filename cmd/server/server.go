@@ -6,18 +6,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"crzy-server/internal/authentication"
+	"crzy-server/internal/models/user"
 )
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	router := gin.Default()
-	// TODO: Remove once done w/ testing
 	// secure := router.Group("/secure", authnMiddleware)
+	// TODO: Remove once done w/ testing
 	unsecure := router.Group("/unsecure", authnMiddlewareMock)
 	// TODO: Max multipart memory
 
@@ -29,6 +31,8 @@ func main() {
 	// router.StaticFile("/login", "./public/login.html")
 
 	// router.POST("/login-form", postLoginForm)
+	router.POST("/register", postRegister)
+	router.POST("/login", postLogin)
 
 	router.POST("/form-upload", postFormUpload)
 	unsecure.POST("/form-upload", postFormUpload)
@@ -139,11 +143,88 @@ func getDownload(c *gin.Context) {
 	// http.ServeContent(c.Writer, c.Request, fi)
 }
 
+func postRegister(c *gin.Context) {
+	// Step 1: Get params from provided json (username, password)
+	// NOTE: Can use another type or just user.User to accomodate for more info
+	var userAuth user.AuthUser
+	if err := c.ShouldBindJSON(&userAuth); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		log.Printf("Error: cannot bind to AuthUser: %s", err.Error())
+		c.Abort()
+		return
+	}
+
+	// Step 2: Check if user already exists (username/email)
+	// TODO:...
+
+	// Step 3: Hash user's password
+	hashedPassword, err := authentication.HashPassword(userAuth.Password)
+	if err != nil {
+		// Error message vague on purpose
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user"})
+		log.Printf("Error: cannot hash password: %s", err.Error())
+		c.Abort()
+		return
+	}
+
+	// Step 4: Store user information
+	user := &user.User{
+		Username:  userAuth.Username,
+		Password:  hashedPassword,
+		CreatedAt: time.Now(),
+	}
+
+	// TODO: store in db
+
+	c.JSON(http.StatusOK, gin.H{"status": "User created"})
+	log.Printf("user '%s' created", user.Username)
+}
+
 func postLogin(c *gin.Context) {
 	// Step 1: Get params from provided json (username, password)
+	var userAuth user.AuthUser
+	if err := c.ShouldBindJSON(&userAuth); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		log.Printf("Error: cannot bind to AuthUser: %s", err.Error())
+		c.Abort()
+		return
+	}
 	// Step 2: Validate username and password
+	// TODO: Fetch from a db
+	// WARNING: Remove, here for testing
+	userFound := user.User{
+		Username: "crzy",
+		Password: "hased_password",
+	}
+
+	// TODO: Actual check if user exists
+	// Simulate user-found logic
+	if userAuth.Username != userFound.Username {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		log.Printf("Error: User not found")
+		c.Abort()
+		return
+	}
+
+	if err := authentication.VerifyPassword(userFound.Password, userAuth.Password); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+		log.Printf("Error: Invalid password")
+		c.Abort()
+		return
+	}
+
 	// Step 3: Generate JWT/Bearer token
+	tkn, err := authentication.NewDefaultTokenString(userFound.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
+		log.Printf("Error: Could not generate token: %s", err.Error())
+		c.Abort()
+		return
+	}
 	// Step 4: Return bearer token as a response
+	c.JSON(http.StatusOK, gin.H{"token": tkn})
+	// TODO: Remove, here for testing
+	log.Printf("Generated token %s for user '%s'", tkn, userFound.Username)
 }
 
 func postLoginForm(c *gin.Context) {
