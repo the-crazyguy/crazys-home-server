@@ -66,6 +66,7 @@ somewhere, which is inconvenient. Instead, they can use credentials (username/pa
 - [Gin static files](https://chroniconl.vercel.app/articles/serving-static-content-with-go-and-gin)
 - [Go JWT Library create tokens](https://golang-jwt.github.io/jwt/usage/create/)
 - [Authentication example](https://mazle78.notion.site/Authentication-and-Authorization-in-Go-with-Gin-120fd437022f80fbab95ff24bf9f0631)
+- [PostgreSQL Go driver](https://github.com/jackc/pgx/tree/master)
 
 ## Resources to look up later
 
