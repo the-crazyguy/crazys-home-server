@@ -14,6 +14,8 @@ type UserRepository interface {
 
 	// Retrieves the IDs of the users that the provided userID trusts
 	GetTrustedUserIDs(userID string) ([]string, error)
+	// Retrieves the IDs of the users who trust userID
+	GetUserIDsTrusting(userID string) ([]string, error)
 	// Creates a trust. userID trusts trustedUserID
 	CreateTrust(userID, trustedUserID string) error
 	// Deletes a trust relationship. userID no longer trusts otherID

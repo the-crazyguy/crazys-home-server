@@ -121,13 +121,99 @@ func (r *PostgresUserRepository) Delete(id string) error {
 }
 
 func (r *PostgresUserRepository) GetTrustedUserIDs(userID string) ([]string, error) {
-	return nil, errors.New("Not implemented")
+	if userID == "" {
+		return nil, errors.New("userID cannot be empty")
+	}
+
+	query := `SELECT trusted_user_id FROM user_trusts WHERE user_id = $1`
+	rows, err := r.db.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get trusted users: %w", err)
+	}
+	defer rows.Close()
+
+	var trustedIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("Failed to scan trustedUserID: %w", err)
+		}
+		trustedIDs = append(trustedIDs, id)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("Failed to iterate over returned trusted_user_id rows: %w", err)
+	}
+
+	return trustedIDs, nil
+}
+
+func (r *PostgresUserRepository) GetUserIDsTrusting(userID string) ([]string, error) {
+	if userID == "" {
+		return nil, errors.New("userID cannot be empty")
+	}
+
+	query := `SELECT user_id FROM user_trusts WHERE trusted_user_id = $1`
+
+	rows, err := r.db.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get trusting users: %w", err)
+	}
+	defer rows.Close()
+
+	var trustingUserIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("Failed to scan trusting user: %w", err)
+		}
+		trustingUserIDs = append(trustingUserIDs, id)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("Failed to iterate over returned trusted_user_id rows: %w", err)
+	}
+
+	return trustingUserIDs, nil
 }
 
 func (r *PostgresUserRepository) CreateTrust(userID, trustedUserID string) error {
-	return errors.New("Not implemented")
+	if userID == "" {
+		return errors.New("userID cannot be empty")
+	}
+	if trustedUserID == "" {
+		return errors.New("trustedUserID cannot be empty")
+	}
+
+	// NOTE: Add `ON CONFLICT DO NOTHING`?
+	query := `INSERT INTO user_trusts (user_id, trusted_user_id) VALUES ($1, $2)`
+
+	_, err := r.db.Exec(context.Background(), query, userID, trustedUserID)
+	if err != nil {
+		return fmt.Errorf("Erorr creating trust: %w", err)
+	}
+
+	return nil
 }
 
 func (r *PostgresUserRepository) DeleteTrust(userID, otherID string) error {
-	return errors.New("Not implemented")
+	if userID == "" {
+		return errors.New("userID cannot be empty")
+	}
+	if otherID == "" {
+		return errors.New("otherID cannot be empty")
+	}
+
+	query := `DELETE FROM user_trusts WHERE user_id = $1 AND trusted_user_id = $2`
+
+	cmdTag, err := r.db.Exec(context.Background(), query, userID, otherID)
+	if err != nil {
+		return fmt.Errorf("Failed to delete trust: %w", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("Failed to delete trust, no rows affected")
+	}
+
+	return nil
 }
