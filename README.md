@@ -43,6 +43,22 @@ will be written in Go, however, for production, a more well-established
 solution, such as NGINX, will be used (*after understanding what it does and why
 it is used*)
 
+### Password hashing
+
+Passwords are **hashed on the server-side**.
+
+*If a hash is calculated on the client, the client authenticates to the server by
+submitting their hash. The server then compares the hash to the database entry.
+This means that if the database is exposed, attackers can authenticate as anyone 
+by submitting the correct hash. Even though they cannot determine the original passwords,
+they can still use the hashes directly to break authentication. With client-side hashing,
+the hash effectively becomes the password.*
+[reference](https://www.sjoerdlangkemper.nl/2020/02/12/the-case-for-client-side-hashing-logging-passwords-by-mistake/#:~:text=If%20a%20hash,becomes%20the%20password.)
+
+It can be a good future exercise to implement a more robust way of sending over
+sensitive information, such as hashing in the client and on the server, or adding
+custom salt to the hash that only the server knows how to remove/parse out.
+
 ## Access
 
 - Each user has access to their own files (in their own directory)

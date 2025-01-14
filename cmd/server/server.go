@@ -34,6 +34,7 @@ func main() {
 	router.POST("/register", postRegister)
 	router.POST("/login", postLogin)
 
+	// TODO: Rename/rework
 	router.POST("/form-upload", postFormUpload)
 	unsecure.POST("/form-upload", postFormUpload)
 
