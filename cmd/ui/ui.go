@@ -21,6 +21,8 @@ func main() {
 	router := gin.Default()
 	// TODO: Max multipart memory
 
+	router.StaticFile("/", "./public/ui/index.html")
+
 	router.StaticFile("/login", "./public/login.html")
 	router.POST("/login", postLogin)
 	router.POST("/logout", postLogout)
@@ -28,12 +30,12 @@ func main() {
 	router.StaticFile("/register", "./public/register.html")
 	router.POST("/register", postRegister)
 
-	// TODO: Auth middleware for GETting the other webpages?
+	// TODO: Auth middleware for GETting protected webpages?
 	router.StaticFile("/upload", "./public/upload.html")
 	router.POST("/upload", postUpload)
 
-	// TODO: Can you have an optional param in the middle or does it have to be at the end?
-	router.GET("/download/*owner/:filename")
+	router.GET("/download/:filename", getDownload)
+	router.GET("/download/:filename/:owner", getDownload)
 
 	router.Run("localhost:8081")
 }
@@ -43,10 +45,10 @@ func getDownload(c *gin.Context) {
 	filename := c.Param("filename")
 
 	requestURL := fileServerAddress + "/download"
+	requestURL += "/" + filename
 	if owner != "" {
 		requestURL += "/" + owner
 	}
-	requestURL += "/" + filename
 
 	token, err := c.Cookie("auth_token")
 	if err != nil {

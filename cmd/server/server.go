@@ -39,7 +39,10 @@ func main() {
 	unsecure.POST("/form-upload", postFormUpload)
 
 	router.GET("/download/:filename", authnMiddleware, getDownload)
-	unsecure.GET("/download/:filename", getDownload)
+	router.GET("/download/:filename/:owner", authnMiddleware, getDownload)
+
+	// router.GET("/download/:filename", authnMiddleware, getDownload)
+	// unsecure.GET("/download/:filename", getDownload)
 
 	router.Run("localhost:8080")
 }
