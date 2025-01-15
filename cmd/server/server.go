@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,13 +11,31 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"crzy-server/internal/authentication"
-	"crzy-server/internal/models/user"
+	usermodel "crzy-server/internal/models/user"
+	"crzy-server/internal/repo/user"
 )
+
+var userRepo user.UserRepository
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// TODO: Define in .env
+	dbCfg, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Println("Unable to parse DATABASE_URL:", err.Error())
+		return
+	}
+
+	userRepo, err = user.NewPostgresUserRepository(dbCfg)
+	if err != nil {
+		log.Println("Failed to create a repository: ", err.Error())
+		return
+	}
 
 	router := gin.Default()
 	// secure := router.Group("/secure", authnMiddleware)
@@ -147,10 +167,11 @@ func getDownload(c *gin.Context) {
 	// http.ServeContent(c.Writer, c.Request, fi)
 }
 
+// TODO: (BIG) Register with email to avoid disclosing if the user is found
 func postRegister(c *gin.Context) {
 	// Step 1: Get params from provided json (username, password)
 	// NOTE: Can use another type or just user.User to accomodate for more info
-	var userAuth user.AuthUser
+	var userAuth usermodel.AuthUser
 	if err := c.ShouldBindJSON(&userAuth); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		log.Printf("Error: cannot bind to AuthUser: %s", err.Error())
@@ -159,7 +180,16 @@ func postRegister(c *gin.Context) {
 	}
 
 	// Step 2: Check if user already exists (username/email)
-	// TODO:...
+	userFound, err := userRepo.GetByUsername(userAuth.Username)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// User exists, we have to disclose it unfortunately
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		log.Printf("Error: User already exists: %s", err.Error())
+		c.Abort()
+		return
+	}
+
+	// TODO:... finish
 
 	// Step 3: Hash user's password
 	hashedPassword, err := authentication.HashPassword(userAuth.Password)
@@ -172,7 +202,7 @@ func postRegister(c *gin.Context) {
 	}
 
 	// Step 4: Store user information
-	user := &user.User{
+	user := &usermodel.User{
 		Username:  userAuth.Username,
 		Password:  hashedPassword,
 		CreatedAt: time.Now(),
@@ -186,7 +216,7 @@ func postRegister(c *gin.Context) {
 
 func postLogin(c *gin.Context) {
 	// Step 1: Get params from provided json (username, password)
-	var userAuth user.AuthUser
+	var userAuth usermodel.AuthUser
 	if err := c.ShouldBindJSON(&userAuth); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		log.Printf("Error: cannot bind to AuthUser: %s", err.Error())
@@ -194,18 +224,13 @@ func postLogin(c *gin.Context) {
 		return
 	}
 	// Step 2: Validate username and password
-	// TODO: Fetch from a db
-	// WARNING: Remove, here for testing
-	userFound := user.User{
-		Username: "crzy",
-		Password: "hased_password",
-	}
-
-	// TODO: Actual check if user exists
-	// Simulate user-found logic
-	if userAuth.Username != userFound.Username {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
-		log.Printf("Error: User not found")
+	userFound, err := userRepo.GetByUsername(userAuth.Username)
+	if err != nil {
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{"error": fmt.Sprintf("Could not find user %q", userAuth.Username)},
+		)
+		log.Printf("Could not find user %q", userAuth.Username)
 		c.Abort()
 		return
 	}
@@ -220,8 +245,11 @@ func postLogin(c *gin.Context) {
 	// Step 3: Generate JWT/Bearer token
 	tkn, err := authentication.NewDefaultTokenString(userFound.Username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
-		log.Printf("Error: Could not generate token: %s", err.Error())
+		c.JSON(
+			http.StatusInternalServerError,
+			gin.H{"error": "Could not generate authentication token"},
+		)
+		log.Printf("Error: Could not generate authentication token: %s", err.Error())
 		c.Abort()
 		return
 	}
@@ -229,21 +257,6 @@ func postLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": tkn})
 	// TODO: Remove, here for testing
 	log.Printf("Generated token %s for user '%s'", tkn, userFound.Username)
-}
-
-func postLoginForm(c *gin.Context) {
-	var u struct {
-		Username string `form:"username" binding:"required"`
-	}
-	if err := c.ShouldBind(&u); err != nil {
-		c.String(http.StatusBadRequest, "Binding error: %s", err.Error())
-		log.Println("Binding error: ", err.Error())
-
-		return
-	}
-
-	log.Println("Username: ", u.Username)
-	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": u})
 }
 
 // TODO:
