@@ -20,4 +20,6 @@ type UserRepository interface {
 	CreateTrust(userID, trustedUserID string) error
 	// Deletes a trust relationship. userID no longer trusts otherID
 	DeleteTrust(userID, otherID string) error
+	// Determines whether userID trusts targetID
+	Trusts(userID, targetID string) (bool, error)
 }

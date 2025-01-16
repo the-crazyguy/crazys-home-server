@@ -217,3 +217,21 @@ func (r *PostgresUserRepository) DeleteTrust(userID, otherID string) error {
 
 	return nil
 }
+
+func (r *PostgresUserRepository) Trusts(userID, targetID string) (bool, error) {
+	if userID == "" {
+		return false, errors.New("Empty userID")
+	}
+	if targetID == "" {
+		return false, errors.New("Empty targetID")
+	}
+
+	query := `SELECT EXISTS(SELECT 1 FROM user_trusts WHERE user_id = $1 AND trusted_user_id = $2)`
+
+	var trustExists bool
+	if err := r.db.QueryRow(context.Background(), query, userID, targetID).Scan(&trustExists); err != nil {
+		return false, fmt.Errorf("Failed executing query: %w", err)
+	}
+
+	return trustExists, nil
+}

@@ -40,7 +40,7 @@ func main() {
 	router := gin.Default()
 	// secure := router.Group("/secure", authnMiddleware)
 	// TODO: Remove once done w/ testing
-	unsecure := router.Group("/unsecure", authnMiddlewareMock)
+	// unsecure := router.Group("/unsecure", authnMiddlewareMock)
 	// TODO: Max multipart memory
 
 	// TODO: Add an environment variable/pass a variable for the on-system filepath
@@ -56,7 +56,6 @@ func main() {
 
 	// TODO: Rename/rework
 	router.POST("/form-upload", postFormUpload)
-	unsecure.POST("/form-upload", postFormUpload)
 
 	router.GET("/download/:filename", authnMiddleware, getDownload)
 	router.GET("/download/:filename/:owner", authnMiddleware, getDownload)
@@ -113,6 +112,7 @@ func authnMiddleware(c *gin.Context) {
 	}
 
 	// Step 6: Set the extracted information in the context (c)
+	// NOTE: Is there a better/more secure way to pass it? Can it be tampered with?
 	c.Set("username", claims.Username)
 
 	// Step 7: Continue to next handler
@@ -121,8 +121,8 @@ func authnMiddleware(c *gin.Context) {
 
 func getDownload(c *gin.Context) {
 	// Step 1: Get username from context
-	owner := c.GetString("username")
-	if owner == "" {
+	username := c.GetString("username")
+	if username == "" {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "username is empty or not found"})
 		log.Println("Error: username is empty or not found")
 		c.Abort()
@@ -131,7 +131,6 @@ func getDownload(c *gin.Context) {
 
 	// Step 2: Get filename from URL (or rework to a POST request w/ JSON?)
 	fileName := c.Param("filename")
-
 	if fileName == "" {
 		c.JSON(http.StatusNotFound, gin.H{"error": "filename is empty"})
 		log.Println("Error: filename missing from url")
@@ -139,8 +138,50 @@ func getDownload(c *gin.Context) {
 		return
 	}
 
+	ownerUsername := c.Param("owner")
+	if ownerUsername == "" {
+		// If no owner is provided, assume the file belongs to the logged-in user
+		ownerUsername = username
+	} else if ownerUsername == username {
+		// User is attempting to access their own files, OK
+	} else {
+		// Owner passed, check if owner trusts the currently logged-in user
+		owner, err := userRepo.GetByUsername(ownerUsername)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+			log.Printf("getDownload: Could not find user %q", ownerUsername)
+			c.Abort()
+			return
+		}
+
+		currentUser, err := userRepo.GetByUsername(username)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+			log.Printf("getDownload: Error looking up user %q in the database", username)
+			c.Abort()
+			return
+		}
+
+		canAccess, err := userRepo.Trusts(owner.ID, currentUser.ID)
+		if err != nil {
+			// Message vague on purpose
+			c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+			log.Printf("getDownload: Failed to determine trust relationship: %s", err.Error())
+			c.Abort()
+			return
+		}
+
+		if !canAccess {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient access rights"})
+			log.Printf("getDownload: user %q isn't trusted %q", username, ownerUsername)
+			c.Abort()
+			return
+		}
+	}
+	// Sufficient Access
+
 	// Step 3: Construct filepath
-	path := filepath.Join("user-files", owner, filepath.Clean(fileName))
+	path := filepath.Join("user-files", ownerUsername, filepath.Clean(fileName))
 
 	// WARN: Test for path traversal!
 	if !strings.HasPrefix(path, "user-files") {
@@ -152,8 +193,8 @@ func getDownload(c *gin.Context) {
 
 	// Step 4: Check if the path exists
 	if _, err := os.Stat(path); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
-		log.Printf("Error: file %s not found\n", path)
+		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		log.Printf("getDownload: file %q not found\n", path)
 		c.Abort()
 		return
 	}
@@ -174,29 +215,27 @@ func postRegister(c *gin.Context) {
 	var userAuth usermodel.AuthUser
 	if err := c.ShouldBindJSON(&userAuth); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		log.Printf("Error: cannot bind to AuthUser: %s", err.Error())
+		log.Printf("postRegister: cannot bind to AuthUser: %s", err.Error())
 		c.Abort()
 		return
 	}
 
 	// Step 2: Check if user already exists (username/email)
-	userFound, err := userRepo.GetByUsername(userAuth.Username)
+	_, err := userRepo.GetByUsername(userAuth.Username)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// User exists, we have to disclose it unfortunately
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		log.Printf("Error: User already exists: %s", err.Error())
+		log.Printf("postRegister: User already exists: %s", err.Error())
 		c.Abort()
 		return
 	}
-
-	// TODO:... finish
 
 	// Step 3: Hash user's password
 	hashedPassword, err := authentication.HashPassword(userAuth.Password)
 	if err != nil {
 		// Error message vague on purpose
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user"})
-		log.Printf("Error: cannot hash password: %s", err.Error())
+		log.Printf("postRegister: cannot hash password: %s", err.Error())
 		c.Abort()
 		return
 	}
@@ -208,7 +247,12 @@ func postRegister(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
-	// TODO: store in db
+	if err := userRepo.Create(user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user"})
+		log.Printf("postRegister: Could not create user in database: %s", err.Error())
+		c.Abort()
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "User created"})
 	log.Printf("user '%s' created", user.Username)
@@ -267,7 +311,6 @@ func postLogin(c *gin.Context) {
 //   - append a (n), where n is the smallest number possible (i.e. file(1), file(2), etc.)
 //   - append current date to the file name and strip it when serving it (I like this better)
 func postFormUpload(c *gin.Context) {
-	// owner := c.PostForm("owner-name")	// Depricated
 	owner := c.GetString("username")
 	if owner == "" {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "username is empty or not found"})
@@ -276,11 +319,8 @@ func postFormUpload(c *gin.Context) {
 		return
 	}
 
-	desc := c.PostForm("description")
-
 	// debug
 	log.Println("Owner: ", owner)
-	log.Println("Description: ", desc)
 
 	form, err := c.MultipartForm()
 	if err != nil {
