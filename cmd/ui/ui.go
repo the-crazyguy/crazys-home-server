@@ -7,17 +7,21 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 
+	"crzy-server/internal/environment"
 	"crzy-server/internal/models/user"
 )
 
-// TODO: Extract in .env file
-const fileServerAddress string = "http://localhost:8080"
+var fileServerAddress string
 
 func main() {
-	fmt.Printf("Hello world!\n")
+	environment.Load()
+
+	fileServerAddress = os.Getenv("BACKEND_ADDRESS")
+
 	router := gin.Default()
 	// TODO: Max multipart memory
 

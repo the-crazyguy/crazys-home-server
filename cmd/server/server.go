@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"crzy-server/internal/authentication"
+	"crzy-server/internal/environment"
 	usermodel "crzy-server/internal/models/user"
 	"crzy-server/internal/repo/user"
 )
@@ -23,8 +24,8 @@ var userRepo user.UserRepository
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	environment.Load()
 
-	// TODO: Define in .env
 	dbCfg, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Println("Unable to parse DATABASE_URL:", err.Error())
@@ -43,7 +44,7 @@ func main() {
 	// unsecure := router.Group("/unsecure", authnMiddlewareMock)
 	// TODO: Max multipart memory
 
-	// TODO: Add an environment variable/pass a variable for the on-system filepath
+	// NOTE: Add an environment variable/pass a variable for the on-system filepath?
 	// router.Static("/files", "./user-files")
 
 	// TODO: Remove, here for quick testing
