@@ -4,10 +4,9 @@ Home server for file storage and private web hosting
 
 ## Next-time
 
-Login
-
-Implement JWT logic, without worrying about https/tls (will be configured later
-or at the proxy level)
+- Use password fields in HTML for the passwords
+- confirmation for registering
+- Stop username/pw showing up in the url after submission
 
 ## Structure
 

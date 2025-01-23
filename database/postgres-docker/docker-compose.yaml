@@ -5,7 +5,6 @@ services:
     # restart: always
     environment:
       POSTGRES_USER: crzy
-      # POSTGRES_PASSWORD: postgrespw123
       POSTGRES_PASSWORD_FILE: "/run/secrets/postgres-password"
       POSTGRES_DB: crzy-fs-db
     ports:

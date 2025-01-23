@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -44,7 +45,6 @@ func main() {
 	// unsecure := router.Group("/unsecure", authnMiddlewareMock)
 	// TODO: Max multipart memory
 
-	// NOTE: Add an environment variable/pass a variable for the on-system filepath?
 	// router.Static("/files", "./user-files")
 
 	// TODO: Remove, here for quick testing
@@ -56,7 +56,7 @@ func main() {
 	router.POST("/login", postLogin)
 
 	// TODO: Rename/rework
-	router.POST("/form-upload", postFormUpload)
+	router.POST("/form-upload", authnMiddleware, postFormUpload)
 
 	router.GET("/download/:filename", authnMiddleware, getDownload)
 	router.GET("/download/:filename/:owner", authnMiddleware, getDownload)
@@ -182,9 +182,18 @@ func getDownload(c *gin.Context) {
 	// Sufficient Access
 
 	// Step 3: Construct filepath
-	path := filepath.Join("user-files", ownerUsername, filepath.Clean(fileName))
+	userFilesPath := os.Getenv("USER_FILES_PATH")
+	if userFilesPath == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "File not found"})
+		log.Printf("getDownload: Failed to retrieve path to user files")
+		c.Abort()
+		return
+	}
+
+	path := filepath.Join(userFilesPath, ownerUsername, filepath.Clean(fileName))
 
 	// WARN: Test for path traversal!
+	// TODO: Try using userFilesPath for the prefix isntead
 	if !strings.HasPrefix(path, "user-files") {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		log.Printf("Error: access to %s is denied\n", path)
@@ -223,10 +232,16 @@ func postRegister(c *gin.Context) {
 
 	// Step 2: Check if user already exists (username/email)
 	_, err := userRepo.GetByUsername(userAuth.Username)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if err == nil {
 		// User exists, we have to disclose it unfortunately
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		log.Printf("postRegister: User already exists: %s", err.Error())
+		log.Printf("postRegister: User already exists")
+		c.Abort()
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		// Got an error different from no rows
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
+		log.Printf("postRegister: Failed to register user: %s", err.Error())
 		c.Abort()
 		return
 	}
@@ -241,8 +256,12 @@ func postRegister(c *gin.Context) {
 		return
 	}
 
+	// Step 3.5: Generate id
+	userID := uuid.New()
+
 	// Step 4: Store user information
 	user := &usermodel.User{
+		ID:        userID.String(),
 		Username:  userAuth.Username,
 		Password:  hashedPassword,
 		CreatedAt: time.Now(),
@@ -339,12 +358,22 @@ func postFormUpload(c *gin.Context) {
 		return
 	}
 
-	uploadDir := filepath.Join(".", "user-files", owner)
+	userFilesPath := os.Getenv("USER_FILES_PATH")
+	if userFilesPath == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "File not found"})
+		log.Println("postFormUpload: Failed to retrieve path to user files")
+		c.Abort()
+		return
+	}
+
+	uploadDir := filepath.Join(userFilesPath, owner)
 	log.Printf("uploadDir: %s\n", uploadDir)
 
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		c.String(http.StatusInternalServerError, "Directory creation error: %s", err.Error())
-		log.Println("Directory creation error: ", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file"})
+		log.Printf("postFormUpload: Failed to create directory %s: %s", uploadDir, err.Error())
+		c.Abort()
+		return
 	}
 
 	for _, f := range files {
@@ -354,12 +383,15 @@ func postFormUpload(c *gin.Context) {
 		log.Printf("uploadPath: %s\n", uploadPath)
 
 		if err := c.SaveUploadedFile(f, uploadPath); err != nil {
-			c.String(http.StatusBadRequest, "Upload file error: %s", err.Error())
-			log.Println("Upload file error: ", err.Error())
-
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file"})
+			log.Printf("postFormUpload: Failed to upload file: %s", err.Error())
+			c.Abort()
 			return
 		}
 	}
 
-	c.String(http.StatusOK, "Successfully uploaded %d files.", len(files))
+	c.JSON(
+		http.StatusOK,
+		gin.H{"message": fmt.Sprintf("Successfully uploaded %d files.", len(files))},
+	)
 }

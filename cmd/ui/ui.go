@@ -29,6 +29,8 @@ func main() {
 
 	router.StaticFile("/login", "./public/login.html")
 	router.POST("/login", postLogin)
+
+	router.StaticFile("/logout", "./public/logout.html")
 	router.POST("/logout", postLogout)
 
 	router.StaticFile("/register", "./public/register.html")
@@ -149,6 +151,8 @@ func postUpload(c *gin.Context) {
 }
 
 func postRegister(c *gin.Context) {
+	log.Println("postRegister entered")
+
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
