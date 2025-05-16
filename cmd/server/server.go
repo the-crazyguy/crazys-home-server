@@ -288,11 +288,13 @@ func postLogin(c *gin.Context) {
 		return
 	}
 	// Step 2: Validate username and password
+	// NOTE: Do not disclose specifics if the user exists or not
+	// Keep error messages vague
 	userFound, err := userRepo.GetByUsername(userAuth.Username)
 	if err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
-			gin.H{"error": fmt.Sprintf("Could not find user %q", userAuth.Username)},
+			gin.H{"error": fmt.Sprintf("Invalid username or password")},
 		)
 		log.Printf("Could not find user %q", userAuth.Username)
 		c.Abort()
@@ -300,7 +302,7 @@ func postLogin(c *gin.Context) {
 	}
 
 	if err := authentication.VerifyPassword(userFound.Password, userAuth.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		log.Printf("Error: Invalid password")
 		c.Abort()
 		return
